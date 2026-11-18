@@ -12,6 +12,10 @@ SALDO_INICIAL = 0
 CUSTO_PULL_COMUM = 500
 CUSTO_PULL_PREMIUM = 800
 
+# o custo dos pulls pagos sobe conforme o total de cartas do jogador:
+# custo = base * (1 + AUMENTO_CUSTO_POR_CARTA * total_de_cartas)
+AUMENTO_CUSTO_POR_CARTA = 0.01
+
 LIMITE_GRATIS_DIARIO = 4
 
 # seguranca contra loop infinito de compras no mesmo dia
@@ -19,7 +23,7 @@ MAX_COMPRAS_DIA = 10
 
 # chance (por dia) de o jogador esperar juntar moedas pro premium
 # em vez de gastar logo num pull comum
-PROB_ESPERAR_PREMIUM = 0.9
+PROB_ESPERAR_PREMIUM = 0.5
 
 # inicial quando se registra 
 BONUS_PULLS_GRATIS = 5 
@@ -188,6 +192,22 @@ def pull_premium():
 # EXECUTAR PULL E ATUALIZAR SALDO
 # ==================================================
 
+def custo_pull(tipo, estatisticas=None):
+
+    if tipo == "comum":
+        base = CUSTO_PULL_COMUM
+    elif tipo == "premium":
+        base = CUSTO_PULL_PREMIUM
+    else:
+        return 0
+
+    total_cartas = (
+        sum(estatisticas["estrelas"].values()) if estatisticas else 0
+    )
+
+    return round(base * (1 + AUMENTO_CUSTO_POR_CARTA * total_cartas))
+
+
 def executar_pull(tipo, saldo, estatisticas=None, sem_custo=False):
 
     if tipo == "gratis":
@@ -197,12 +217,12 @@ def executar_pull(tipo, saldo, estatisticas=None, sem_custo=False):
 
     elif tipo == "comum":
 
-        custo = CUSTO_PULL_COMUM
+        custo = custo_pull("comum", estatisticas)
         resultados = pull_comum()
 
     elif tipo == "premium":
 
-        custo = CUSTO_PULL_PREMIUM
+        custo = custo_pull("premium", estatisticas)
         resultados = pull_premium()
 
     else:
@@ -336,13 +356,16 @@ def simular_dia(dia, saldo, estatisticas):
 
     while compras_dia < MAX_COMPRAS_DIA:
 
-        if saldo >= CUSTO_PULL_PREMIUM:
-            tipo, custo = "premium", CUSTO_PULL_PREMIUM
-        elif saldo >= CUSTO_PULL_COMUM:
+        custo_premium = custo_pull("premium", estatisticas)
+        custo_comum = custo_pull("comum", estatisticas)
+
+        if saldo >= custo_premium:
+            tipo, custo = "premium", custo_premium
+        elif saldo >= custo_comum:
             # Jogador pode esperar juntar moedas para o premium
             if random.random() < PROB_ESPERAR_PREMIUM:
                 break
-            tipo, custo = "comum", CUSTO_PULL_COMUM
+            tipo, custo = "comum", custo_comum
         else:
             break
 
